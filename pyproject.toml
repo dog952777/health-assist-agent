@@ -1,0 +1,40 @@
+[tool.poetry]
+name = "doctor-assistant-agent"
+version = "0.1.0"
+description = "健康助理智能体：LangChain + MCP + RAG + ReAct"
+authors = ["Your Name <you@example.com>"]
+readme = "README.md"
+packages = [{ include = "src" }]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+# LangChain 核心
+langchain = "^0.3"
+langchain-openai = "^0.2"
+langchain-community = "^0.3"
+# ReAct Agent
+langgraph = "^0.2"
+# RAG：向量库与文档
+langchain-chroma = "^0.1"
+chromadb = "^0.5"
+# 文档加载（按需启用）
+pypdf = "^5"
+unstructured = { version = "^0.16", optional = true }
+# MCP 适配（LangChain 官方适配器）
+langchain-mcp-adapters = "^0.2"
+# 环境与配置
+python-dotenv = "^1.0"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8"
+ruff = "^0.6"
+
+[tool.poetry.extras]
+unstructured = ["unstructured"]
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.scripts]
+doctor-agent = "src.main:main"

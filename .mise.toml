@@ -1,0 +1,4 @@
+# 本项目使用 mise 管理 Python 版本
+# 安装 mise 后在此目录执行: mise install
+[tools]
+python = "3.11"
