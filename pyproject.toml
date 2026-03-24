@@ -12,6 +12,7 @@ python = "^3.11"
 langchain = "^0.3"
 langchain-openai = "^0.2"
 langchain-community = "^0.3"
+langchain-text-splitters = "^0.3"
 # ReAct Agent
 langgraph = "^0.2"
 # RAG：向量库与文档
@@ -38,3 +39,4 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry.scripts]
 doctor-agent = "src.main:main"
+health-ingest = "src.rag_ingest:main"

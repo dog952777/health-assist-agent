@@ -19,13 +19,17 @@ AI/
 ├── src/                    # 应用代码
 │   ├── __init__.py         # 将 src 声明为 Python 包
 │   ├── main.py             # CLI 入口、对话循环、错误提示
-│   ├── agent.py            # LLM 实例、对话链（LCEL）
-│   ├── config.py           # 读取 .env、路径、超时、Base URL 校验等
-│   ├── prompts.py          # System Prompt（人设与合规边界）
-│   └── tools/              # 预留：RAG Tool、MCP 转 LangChain Tools 等
-│       └── __init__.py
+│   ├── agent.py            # LLM、RAG 链或纯对话链（LCEL）
+│   ├── rag.py              # Chroma 持久化、加载/分段、检索
+│   ├── rag_ingest.py       # 强制重建向量索引
+│   ├── config.py           # 读取 .env、路径、超时、RAG 开关等
+│   ├── prompts.py          # System Prompt、RAG 上下文模板
+│   └── tools/              # RAG Tool（ReAct 预留）、后续 MCP
+│       ├── __init__.py
+│       └── rag_tool.py
 ├── data/
-│   └── knowledge/          # 预留：RAG 原始文档（PDF/TXT/MD 等）
+│   ├── knowledge/          # RAG 原始文档（.md / .txt）
+│   └── chroma_db/          # 本地向量库（不入库，见 .gitignore）
 └── docs/
     ├── ARCHITECTURE.md     # 本文档
     └── eval_examples.md    # 预留：评测用例与预期行为
