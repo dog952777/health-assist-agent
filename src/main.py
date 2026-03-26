@@ -1,11 +1,13 @@
 """
 入口：阶段1 纯 LLM；阶段2 固定 RAG 链；阶段3 ReAct + 工具（默认）。
 """
+import ssl
 import sys
+import traceback
 from typing import Iterator
 
 from src.agent import chat, chat_react, get_chat_chain, get_react_agent
-from src.config import OPENAI_API_KEY, REACT_VERBOSE, USE_RAG, USE_REACT_AGENT
+from src.config import OPENAI_API_KEY, REACT_VERBOSE, USE_MCP, USE_RAG, USE_REACT_AGENT
 
 
 def _iter_exception_chain(exc: BaseException) -> Iterator[BaseException]:
@@ -25,6 +27,7 @@ def _print_network_error_hint(exc: BaseException) -> bool:
     timeout_types = frozenset(
         {"APITimeoutError", "ConnectTimeout", "ReadTimeout", "TimeoutError", "PoolTimeout"}
     )
+    # 含 httpx/httpcore 经代理 CONNECT + TLS 握手失败时常见的类名（未必封装成 APIConnectionError）
     connection_types = frozenset(
         {
             "APIConnectionError",
@@ -33,9 +36,26 @@ def _print_network_error_hint(exc: BaseException) -> bool:
             "ProxyError",
             "SSLError",
             "CertificateError",
+            "RemoteProtocolError",
+            "LocalProtocolError",
+            "ProtocolError",
+            "TLSStreamError",
+            "SSLEOFError",
         }
     )
     for link in _iter_exception_chain(exc):
+        # 标准库 SSL：走代理时 start_tls / do_handshake 失败常为 ssl.SSLError 子类
+        if isinstance(link, ssl.SSLError):
+            print(
+                "助理: 无法连上模型服务（连接或 TLS/SSL 失败）。\n"
+                "若报错栈里有 http_proxy、start_tls、do_handshake 等：多为 **HTTP(S) 代理** "
+                "在目标 API 的 TLS 隧道上失败（公司网关、错误代理端口、或本机 HTTPS 扫描/解密）。\n"
+                "可尝试：① 在当前终端临时取消 HTTP_PROXY/HTTPS_PROXY 再试；"
+                "② 换支持 HTTPS CONNECT 的代理（如 Clash / v2ray 正确规则）；"
+                "③ 使用国内兼容网关并设好 OPENAI_API_BASE；④ 将 Python/终端加入杀软信任或排除目标域名。\n"
+                "说明：Key、BASE、LLM_MODEL 须匹配同一服务商；**本错误与 MCP/读文件夹无关，大模型请求未成功。**\n"
+            )
+            return True
         name = type(link).__name__
         if name in timeout_types:
             print(
@@ -48,14 +68,27 @@ def _print_network_error_hint(exc: BaseException) -> bool:
         if name in connection_types:
             print(
                 "助理: 无法连上模型服务（连接或 TLS/SSL 失败）。\n"
-                "若报错栈里有 http_proxy、start_tls、UNEXPECTED_EOF 等：多为 **系统/环境变量里的 HTTP(S) 代理** "
+                "若报错栈里有 http_proxy、start_tls、do_handshake、UNEXPECTED_EOF 等：多为 **环境里的 HTTP(S) 代理** "
                 "在 TLS 握手时断开（公司网关、不支持 CONNECT 的代理、或本机「HTTPS 解密」安全软件）。\n"
                 "可尝试：① 在无代理的终端重试，或换 Clash / v2ray 等正确支持 HTTPS 隧道的代理；"
                 "② 使用国内兼容接口（如百炼）并设好 OPENAI_API_BASE；"
                 "③ 暂时关闭对 Python/终端的 HTTPS 扫描或排除目标域名。\n"
-                "说明：Key、BASE、LLM_MODEL 三者须匹配同一服务商文档。\n"
+                "说明：Key、BASE、LLM_MODEL 三者须匹配同一服务商文档；**若正在问 MCP 读目录，请先保证模型 API 能通。**\n"
             )
             return True
+    # 部分错误被多层包装，类名不在上表；根据栈文本识别「代理 + TLS」典型路径
+    try:
+        tb_text = "".join(traceback.format_exception(exc)).lower()
+    except Exception:
+        tb_text = ""
+    if "http_proxy" in tb_text and ("start_tls" in tb_text or "do_handshake" in tb_text):
+        print(
+            "助理: 无法连上模型服务（经 HTTP 代理建立 HTTPS 隧道失败）。\n"
+            "常见于环境变量 HTTP_PROXY/HTTPS_PROXY 或系统代理：TLS 握手在代理链路上中断。\n"
+            "请尝试在无代理终端运行、修正代理软件规则，或改用国内 OPENAI_API_BASE；详见上文同类说明。\n"
+            "说明：**须先让对话模型能访问成功，MCP 读文件才会被模型调用。**\n"
+        )
+        return True
     return False
 
 
@@ -69,6 +102,8 @@ def main():
         mode_tip = "阶段3：ReAct + 工具（时间/计算"
         if USE_RAG:
             mode_tip += " + 知识库检索"
+        if USE_MCP:
+            mode_tip += " + MCP 文件系统"
         mode_tip += "）"
         runner = get_react_agent()
     else:

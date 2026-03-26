@@ -19,11 +19,20 @@ poetry install
 # 3. 配置 API Key（复制 .env.example 为 .env 并填写）
 cp .env.example .env
 
-# 4. 运行阶段1 对话（纯 LLM）
+# 4. 运行对话（默认 ReAct + 可选 RAG；见 .env）
 poetry run python -m src.main
 # 或
 poetry run doctor-agent
 ```
+
+### 阶段 4：MCP 文件系统（可选）
+
+1. 安装 [Node.js](https://nodejs.org/)，确保终端能执行 **`npx`**。  
+2. 在 **`.env`** 设置 **`USE_MCP=true`**（并保持 **`USE_REACT_AGENT=true`**）。  
+3. 将允许 Agent 读取的文件放在 **`data/mcp_allowed/`**（或配置 **`MCP_FILESYSTEM_ROOT`**）。  
+4. 启动后若成功，会看到 **`[MCP] 已连接 filesystem…`**；失败会降级为无 MCP，仅打印原因。  
+
+原理与新手详解见 **[docs/PHASE4_LEARNING.md](./docs/PHASE4_LEARNING.md)**；操作与验收见 **[docs/PHASE4_RUN_FLOW.md](./docs/PHASE4_RUN_FLOW.md)**。
 
 ## 构建计划
 
@@ -31,7 +40,8 @@ poetry run doctor-agent
 
 ## 架构与目录
 
-从研发与系统分层角度的说明见 **[docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md)**。
+从研发与系统分层角度的说明见 **[docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md)**。  
+阶段 4 流程说明见 **[docs/PHASE4_RUN_FLOW.md](./docs/PHASE4_RUN_FLOW.md)**。
 
 ## 项目结构
 

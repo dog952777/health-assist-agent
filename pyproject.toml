@@ -21,8 +21,8 @@ chromadb = "^0.5"
 # 文档加载（按需启用）
 pypdf = "^5"
 unstructured = { version = "^0.16", optional = true }
-# MCP 适配（LangChain 官方适配器）
-langchain-mcp-adapters = "^0.2"
+# MCP 适配：0.2.x 需 langchain-core 1.x；当前栈为 langchain 0.3 + core 0.3，固定 0.1.14
+langchain-mcp-adapters = "0.1.14"
 # 环境与配置
 python-dotenv = "^1.0"
 

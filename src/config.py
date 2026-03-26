@@ -118,3 +118,36 @@ REACT_VERBOSE = _strip_env("REACT_VERBOSE", "false").lower() in (
     "yes",
     "on",
 )
+
+# ---------- 阶段 4：MCP（默认 stdio 拉起官方 filesystem server）----------
+USE_MCP = _strip_env("USE_MCP", "false").lower() in ("1", "true", "yes", "on")
+# 允许 MCP 读写的根目录（相对路径相对项目根）；启动时会自动创建
+_mcp_root_raw = _strip_env("MCP_FILESYSTEM_ROOT", "data/mcp_allowed")
+MCP_FILESYSTEM_ROOT = (
+    Path(_mcp_root_raw)
+    if Path(_mcp_root_raw).is_absolute()
+    else (Path(__file__).resolve().parent.parent / _mcp_root_raw).resolve()
+)
+# Windows/Linux 下启动 npx 的命令（可改为 npx.cmd 或绝对路径）
+MCP_NPX_COMMAND = _strip_env("MCP_NPX_COMMAND", "npx")
+
+
+def _build_mcp_server_connections() -> dict[str, dict]:
+    """供 MultiServerMCPClient 的 connections 参数；未启用 MCP 时为空。"""
+    if not USE_MCP:
+        return {}
+    MCP_FILESYSTEM_ROOT.mkdir(parents=True, exist_ok=True)
+    return {
+        "fs": {
+            "transport": "stdio",
+            "command": MCP_NPX_COMMAND,
+            "args": [
+                "-y",
+                "@modelcontextprotocol/server-filesystem",
+                str(MCP_FILESYSTEM_ROOT),
+            ],
+        }
+    }
+
+
+MCP_SERVER_CONNECTIONS = _build_mcp_server_connections()

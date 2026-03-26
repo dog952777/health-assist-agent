@@ -26,3 +26,10 @@ REACT_AGENT_SYSTEM = """你是一位健康助理（与上述规则一致）：
 - 任何工具无结果或不足以下结论时，诚实说明，并提醒用户咨询医生或药师。"""
 
 REACT_AGENT_PROMPT = f"{SYSTEM_PROMPT}\n\n{REACT_AGENT_SYSTEM}"
+
+# 阶段 4：启用 MCP filesystem 时追加（工具名以模型可见列表为准，常见如 list_directory / read_file）
+REACT_AGENT_MCP_HINT = """【MCP 文件系统工具】
+- 来自 MCP「文件系统」服务的工具会出现在你的可调用工具列表中（常见名如 **list_directory**、**read_file** 等，以列表为准；部分版本可能带服务器名前缀），只能访问配置目录（MCP_FILESYSTEM_ROOT，常见为 data/mcp_allowed）下的文件。
+- 当用户请你「列出某文件夹有哪些文件」「读某个文件」「打开用药备忘」且路径在该允许目录内时：**必须先调用上述文件类 MCP 工具**，再据工具返回作答；不要编造目录内容。
+- **禁止**回答「无法访问本地文件系统」「不能查看你设备上的文件夹」——在本环境下你已具备经用户授权的、仅限上述目录的 MCP 文件能力；若工具报错或路径越界，再如实说明。
+- 与 **search_health_knowledge** 的区别：知识库是语义检索摘要；MCP 是允许目录下的**原文**按文件读写（在工具支持的操作范围内）。"""

@@ -14,9 +14,15 @@ from src.config import (
     OPENAI_API_KEY,
     OPENAI_TIMEOUT,
     REACT_VERBOSE,
+    USE_MCP,
     USE_RAG,
 )
-from src.prompts import RAG_CONTEXT_SYSTEM, REACT_AGENT_PROMPT, SYSTEM_PROMPT
+from src.prompts import (
+    RAG_CONTEXT_SYSTEM,
+    REACT_AGENT_MCP_HINT,
+    REACT_AGENT_PROMPT,
+    SYSTEM_PROMPT,
+)
 
 
 def get_llm():
@@ -81,25 +87,35 @@ def get_rag_chat_chain():
 
 
 def get_react_tools():
-    """阶段3：按配置组装工具（时间、计算器；可选知识库检索）。"""
+    """阶段3/4：本地工具 + 可选 RAG + 可选 MCP（filesystem）。"""
     from src.tools.basic_tools import calculator, get_current_datetime
+    from src.tools.mcp_tools import get_mcp_tools_or_empty
     from src.tools.rag_tool import search_health_knowledge
 
-    tools = [get_current_datetime, calculator]
+    tools: list = [get_current_datetime, calculator]
     if USE_RAG:
         tools.append(search_health_knowledge)
+    if USE_MCP:
+        tools.extend(get_mcp_tools_or_empty())
     return tools
+
+
+def _react_system_prompt() -> str:
+    """ReAct 用 system：启用 MCP 时追加文件系统说明。"""
+    if USE_MCP:
+        return f"{REACT_AGENT_PROMPT}\n\n{REACT_AGENT_MCP_HINT}"
+    return REACT_AGENT_PROMPT
 
 
 def get_react_agent():
     """
-    阶段3：LangGraph 预置 ReAct 图；模型在「思考—调工具—再思考」循环中结束于最终答复。
+    阶段3/4：LangGraph 预置 ReAct 图；工具含可选 MCP filesystem。
     """
     from langgraph.prebuilt import create_react_agent
 
     llm = get_llm()
     tools = get_react_tools()
-    return create_react_agent(llm, tools, prompt=REACT_AGENT_PROMPT)
+    return create_react_agent(llm, tools, prompt=_react_system_prompt())
 
 
 def _message_content_to_text(content) -> str:

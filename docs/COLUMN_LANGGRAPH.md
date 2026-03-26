@@ -1,7 +1,7 @@
 # 专栏：LangGraph — 原理、工作机制与应用
 
 > 面向：在已了解 **LangChain 基础**（Runnable、消息、工具）的前提下，理解 **有状态、可循环** 的智能体编排。  
-> **LangChain 专栏**（组件与 LCEL）：[COLUMN_LANGCHAIN.md](./COLUMN_LANGCHAIN.md)。
+> **LangChain 专栏**（组件与 LCEL、依赖包、业务入口）：[COLUMN_LANGCHAIN.md](./COLUMN_LANGCHAIN.md)。
 
 ---
 
@@ -17,6 +17,16 @@
 **它是什么**：
 
 - **控制流引擎**：专门管 **分支、循环、多步**，直到满足结束条件。
+
+### 1.1 与本项目相关的 pip 包
+
+| 包名 | 角色 |
+|------|------|
+| **`langgraph`** | 主包：**预置 Agent**（如 `create_react_agent`）、图的 **编译** 与 **`invoke` / `stream`**；自定义时再使用 `StateGraph`、`ToolNode`、条件边等 |
+| **`langgraph-checkpoint`**（随依赖安装） | **检查点**：持久化图状态、断点恢复；**本项目 CLI 对话未显式配置 checkpointer**，一轮轮状态在**进程内存**中 |
+| **`langgraph-sdk`**（随依赖安装） | 与 **LangGraph 平台 / 远程 API** 交互；**本地 `python -m src.main` 一般不直接写 SDK 代码** |
+
+**记忆**：当前仓库里与 LangGraph **直接打交道**的入口主要是 **`langgraph.prebuilt.create_react_agent`**；需要人机协同、持久会话、复杂分支时再深入 **Checkpoint / interrupt / Subgraph**。
 
 ---
 
@@ -125,32 +135,91 @@
 ## 6. 学习路径建议
 
 1. 先跑通 **`invoke({"messages": [...]})`**，打印最终 **`messages` 长度与类型**（Human / AI / Tool）。  
-2. 理解 **一次用户输入** 为何对应 **多次** Chat API（见本项目 `docs/PHASE3_RUN_FLOW.md` §8）。  
+2. 理解 **一次用户输入** 为何对应 **多次** Chat API（见本项目 [PHASE3_RUN_FLOW.md](./PHASE3_RUN_FLOW.md)）。  
 3. 阅读官方 **Graph 入门**、**ToolNode**、**条件边**。  
 4. 再学 **Checkpointer**、**interrupt**、**Subgraph**。
 
-**官方参考**：  
-[LangGraph 文档](https://langchain-ai.github.io/langgraph/)
+**官方参考**（与当前文档站一致）：  
+[LangGraph OSS Python 概览](https://docs.langchain.com/oss/python/langgraph/overview) · [旧站文档](https://langchain-ai.github.io/langgraph/) · [Python API 参考](https://reference.langchain.com/python/langgraph/)
 
 ---
 
-## 7. 与本项目对照
+## 7. 与本项目对照（概念 → 代码文件）
 
 | 概念 | 本项目位置 |
 |------|------------|
-| 预置 ReAct 图 | `src/agent.py` → `get_react_agent()` → `create_react_agent` |
-| 工具列表 | `get_react_tools()` |
-| 单轮封装与取最终回复 | `chat_react()`、`_final_assistant_text()` |
-| 系统提示 | `src/prompts.py` → `REACT_AGENT_PROMPT` |
-| 流程图与 messages 推演 | `docs/PHASE3_RUN_FLOW.md` |
+| 预置 ReAct 图构建 | `src/agent.py` → `get_react_agent()` → `langgraph.prebuilt.create_react_agent` |
+| 工具列表（并入同一张图） | `get_react_tools()`（含可选 RAG 工具、可选 MCP） |
+| 单轮对话封装 | `chat_react()` |
+| 执行图（含 Verbose 下 `stream` / fallback `invoke`） | `_run_react_graph()` |
+| 从 `messages` 取最终对用户可见文案 | `_final_assistant_text()` |
+| ReAct 调试打印（步骤摘要、完整消息链） | `_log_react_step`、`_log_full_message_chain` |
+| 系统提示（含 MCP 追加段） | `src/prompts.py` → `REACT_AGENT_PROMPT`、`REACT_AGENT_MCP_HINT` |
+| 入口选择链还是图 | `src/main.py`（`USE_REACT_AGENT`） |
+| 流程与 messages 推演 | [PHASE3_RUN_FLOW.md](./PHASE3_RUN_FLOW.md)、[PHASE4_RUN_FLOW.md](./PHASE4_RUN_FLOW.md) |
 
 ---
 
-## 8. 常见误区
+## 8. 何时走 LangGraph、何时仍用 LCEL
 
-1. **「用了 LangGraph 就不用 LangChain」** — 错误；节点里仍在用 LangChain 模型与工具。  
+| `USE_REACT_AGENT`（`.env`） | 编排方式 | 入口 |
+|---------------------------|----------|------|
+| **`true`（默认）** | **LangGraph** 预置 ReAct 图 | `main` → `get_react_agent()` → `chat_react()` |
+| **`false`** | **LangChain** LCEL 链 | `get_chat_chain()` → `chat()` |
+
+**阶段 4（MCP）**：在 **`USE_REACT_AGENT=true`** 的前提下，仅 **`USE_MCP=true`** 时把 MCP 工具 **extend 进 `get_react_tools()`**；**仍是同一张 ReAct 图**，没有单独的「MCP 子图」。
+
+---
+
+## 9. 业务入口：与 LangGraph 直接相关的 `src/agent.py` API
+
+日常扩展 **Agent 行为**时，优先改下面这些，而不是假设存在另一套「LangGraph 专用业务层」：
+
+| 符号 | 作用 |
+|------|------|
+| `get_react_agent()` | 用当前 `get_llm()` + `get_react_tools()` + `_react_system_prompt()` 构建并返回 **CompiledGraph** |
+| `get_react_tools()` | 提供给 `create_react_agent` 的 **工具列表**（LangChain `BaseTool`） |
+| `chat_react(agent_graph, user_input, history)` | 把历史与本轮用户句转成 **`messages`**，调用 `_run_react_graph`，再用 `_final_assistant_text` 得到字符串回复 |
+| `_run_react_graph(agent_graph, messages)` | **`REACT_VERBOSE=false`**：直接 `agent_graph.invoke({"messages": ...})`；**为 true**：优先 **`stream(..., stream_mode="values")`** 打印每步，失败则 **fallback `invoke`** |
+| `_final_assistant_text(messages)` | 从完整 **`messages`** 中倒序查找 **最后一条带正文的 `AIMessage`**，作为本轮展示给用户的内容 |
+
+**图的输入约定**（与本项目一致）：**`{"messages": [...]}`**；其中 `messages` 为 `HumanMessage` / `AIMessage` / `ToolMessage` 等（来自 **`langchain_core.messages`**）。
+
+---
+
+## 10. `invoke` 与 `stream` 在本项目中的含义
+
+- **`invoke`**：一次调用跑完**本轮用户问题**所需的 **全部** 图步（可能多轮「模型 → 工具 → 模型」），返回 **最终 state**（含完整 `messages`）。  
+- **`stream(..., stream_mode="values")`**：可能在中途多次 yield **state 快照**；不同版本下「每步是否都 yield」行为可能不同，因此本项目在 **`REACT_VERBOSE=true`** 时除逐步日志外，还会在末尾打印 **完整消息链**，便于对照 **`tool_calls`** 与 **`ToolMessage`**。  
+- **网络错误**：若在 `stream` 阶段失败，`main.py` 可能收到异常并提示检查代理/API；与 LangGraph 逻辑无关，属 **LLM 连接**问题。
+
+---
+
+## 11. 阶段 3 / 4 与 LangGraph（一句话）
+
+| 阶段 | LangGraph 承担什么 |
+|------|---------------------|
+| **3** | 用 **`create_react_agent`** 搭好 **ReAct 拓扑**，按需调用 **时间 / 计算器 / 可选知识库检索工具** |
+| **4** | **拓扑不变**；工具列表增加 **MCP filesystem**（经 `langchain-mcp-adapters` 转成 `BaseTool`），模型仍通过 **同一张图** 调度 |
+
+---
+
+## 12. 官方文档与 API 检索（自学用）
+
+| 用途 | 链接 |
+|------|------|
+| LangGraph Python 总览 | [docs.langchain.com/oss/python/langgraph](https://docs.langchain.com/oss/python/langgraph/overview) |
+| 与 LangChain 文档同一体系 | [docs.langchain.com](https://docs.langchain.com/) |
+| 按符号搜 Python API | [reference.langchain.com/python/langgraph](https://reference.langchain.com/python/langgraph/)（如搜 `create_react_agent`、`StateGraph`） |
+
+---
+
+## 13. 常见误区
+
+1. **「用了 LangGraph 就不用 LangChain」** — 错误；节点里仍在用 LangChain 的 **ChatModel、Tool、Message**。  
 2. **「tools 数组会按顺序执行」** — 错误；由模型 **`tool_calls`** 决定调哪个、顺序如何。  
-3. **「所有 RAG 都要上 LangGraph」** — 不必；**每轮固定检索**用 LCEL 更直接。
+3. **「所有 RAG 都要上 LangGraph」** — 不必；**每轮固定检索**用 LCEL 更直接（见 `get_rag_chat_chain`）。  
+4. **「MCP 会单独起一个 LangGraph」** — 在本项目中 **错误**；MCP 只是 **更多 Tool** 加入 **同一 ReAct 图**。
 
 ---
 
