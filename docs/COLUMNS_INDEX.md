@@ -19,4 +19,6 @@
 - 阶段 3 知识点与自测：[PHASE3_LEARNING.md](./PHASE3_LEARNING.md)  
 - 阶段 4 MCP（原理详解）：[PHASE4_LEARNING.md](./PHASE4_LEARNING.md)  
 - 阶段 4 MCP（操作与验收）：[PHASE4_RUN_FLOW.md](./PHASE4_RUN_FLOW.md)  
+- 阶段 5（敏感提示 + 历史截断 + 文档）：[PHASE5_LEARNING.md](./PHASE5_LEARNING.md) · [PHASE5_RUN_FLOW.md](./PHASE5_RUN_FLOW.md)  
+- 评测用例表：[eval_examples.md](./eval_examples.md)  
 - 构建计划：[BUILD_PLAN.md](../BUILD_PLAN.md)

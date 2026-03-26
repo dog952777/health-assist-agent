@@ -19,20 +19,27 @@ AI/
 ├── src/                    # 应用代码
 │   ├── __init__.py         # 将 src 声明为 Python 包
 │   ├── main.py             # CLI 入口、对话循环、错误提示
-│   ├── agent.py            # LLM、RAG 链或纯对话链（LCEL）
+│   ├── agent.py            # LLM、RAG 链、ReAct、历史截断
+│   ├── sensitive_hint.py   # 阶段 5：敏感类别、本轮用户句注入
 │   ├── rag.py              # Chroma 持久化、加载/分段、检索
 │   ├── rag_ingest.py       # 强制重建向量索引
-│   ├── config.py           # 读取 .env、路径、超时、RAG 开关等
+│   ├── config.py           # 读取 .env、路径、超时、RAG、历史上限等
 │   ├── prompts.py          # System Prompt、RAG 上下文模板
-│   └── tools/              # RAG Tool（ReAct 预留）、后续 MCP
+│   └── tools/              # 本地工具、RAG Tool、MCP
 │       ├── __init__.py
-│       └── rag_tool.py
+│       ├── basic_tools.py
+│       ├── rag_tool.py
+│       └── mcp_tools.py
 ├── data/
 │   ├── knowledge/          # RAG 原始文档（.md / .txt）
 │   └── chroma_db/          # 本地向量库（不入库，见 .gitignore）
+├── tests/                  # 可选单测（如敏感模块）
+│   └── test_sensitive_hint.py
 └── docs/
     ├── ARCHITECTURE.md     # 本文档
-    └── eval_examples.md    # 预留：评测用例与预期行为
+    ├── eval_examples.md    # 抽检用例与预期行为
+    ├── PHASE5_LEARNING.md  # 阶段 5 原理
+    └── PHASE5_RUN_FLOW.md  # 阶段 5 操作与验收
 ```
 
 ---
@@ -49,7 +56,8 @@ AI/
 | **`src/main.py`** | **交付入口**：现为 CLI；若增加 Web/API，可新增模块或改入口，复用 `agent.chat` 等能力。 |
 | **`src/tools/`** | **能力扩展点**：RAG 检索、MCP 工具等按模块拆分，便于单测与复用。 |
 | **`data/knowledge/`** | **RAG 语料**：仅放置合规、有权限使用的文档；索引与向量库路径建议由 `rag` 或 `tools` 层管理。 |
-| **`docs/eval_examples.md`** | **回归清单**：变更 Prompt 或模型后按表抽检，防止行为漂移。 |
+| **`docs/eval_examples.md`** | **回归清单**：变更 Prompt、敏感规则或模型后按表抽检。 |
+| **`src/sensitive_hint.py`** | **阶段 5**：关键词命中后对「本轮」用户消息注入安全前缀（`history` 仍存原文）。 |
 | **`BUILD_PLAN.md`** | **路线图**：与里程碑对齐，便于分工（RAG / MCP / 评测）。 |
 
 **日常开发流**：修改代码 → `poetry run python -m src.main` 或 `poetry run doctor-agent` → 按需补充 `tests/`（可选）。

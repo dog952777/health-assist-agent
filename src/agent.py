@@ -9,11 +9,13 @@ from langchain_core.runnables import RunnableLambda
 from langchain_openai import ChatOpenAI
 
 from src.config import (
+    CHAT_HISTORY_MAX_TURNS,
     DEFAULT_LLM_MODEL,
     OPENAI_API_BASE,
     OPENAI_API_KEY,
     OPENAI_TIMEOUT,
     REACT_VERBOSE,
+    SENSITIVE_HINT_ENABLED,
     USE_MCP,
     USE_RAG,
 )
@@ -23,6 +25,7 @@ from src.prompts import (
     REACT_AGENT_PROMPT,
     SYSTEM_PROMPT,
 )
+from src.sensitive_hint import augment_user_message_if_needed
 
 
 def get_llm():
@@ -98,6 +101,13 @@ def get_react_tools():
     if USE_MCP:
         tools.extend(get_mcp_tools_or_empty())
     return tools
+
+
+def _trim_chat_history(history: list) -> list:
+    """阶段 5：限制 (用户, 助理) 轮数，避免上下文无限增长超出模型窗口。"""
+    if len(history) <= CHAT_HISTORY_MAX_TURNS:
+        return history
+    return history[-CHAT_HISTORY_MAX_TURNS:]
 
 
 def _react_system_prompt() -> str:
@@ -245,13 +255,16 @@ def chat(chain, user_input: str, history: list):
     :param chain: get_chat_chain() 返回的 Runnable
     :param history: 之前的 (用户原文, 助理原文) 元组列表
     """
+    history = _trim_chat_history(history)
+    # 本轮可带敏感提示前缀；存入历史的仍为 user 原文，避免下一轮重复堆叠提示
+    effective_input = augment_user_message_if_needed(user_input, SENSITIVE_HINT_ENABLED)
     messages = []
     for h, a in history:
         messages.append(HumanMessage(content=h))
         messages.append(AIMessage(content=a))
-    result = chain.invoke({"input": user_input, "history": messages})
+    result = chain.invoke({"input": effective_input, "history": messages})
     ai_text = result.content if hasattr(result, "content") else str(result)
-    new_history = history + [(user_input, ai_text)]
+    new_history = _trim_chat_history(history + [(user_input, ai_text)])
     return ai_text, new_history
 
 
@@ -261,14 +274,16 @@ def chat_react(agent_graph, user_input: str, history: list):
     :param agent_graph: get_react_agent() 返回值
     :param history: 之前的 (用户原文, 助理原文) 元组列表
     """
+    history = _trim_chat_history(history)
+    effective_input = augment_user_message_if_needed(user_input, SENSITIVE_HINT_ENABLED)
     messages = []
     for h, a in history:
         messages.append(HumanMessage(content=h))
         messages.append(AIMessage(content=a))
-    messages.append(HumanMessage(content=user_input))
+    messages.append(HumanMessage(content=effective_input))
     result = _run_react_graph(agent_graph, messages)
     ai_text = _final_assistant_text(result["messages"])
     if not ai_text:
         ai_text = "（本轮未生成可见答复，请重试或简化问题。）"
-    new_history = history + [(user_input, ai_text)]
+    new_history = _trim_chat_history(history + [(user_input, ai_text)])
     return ai_text, new_history

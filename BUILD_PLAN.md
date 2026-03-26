@@ -118,6 +118,8 @@ LangChain ReAct Agent
 
 **验收**：多轮对话稳定、敏感问题有免责提示、文档齐全可复现。
 
+**本仓库实现说明**：`src/sensitive_hint.py` + `src/agent.py`（历史截断与本轮注入）+ `docs/PHASE5_LEARNING.md` / `docs/PHASE5_RUN_FLOW.md` + `docs/eval_examples.md`。
+
 ---
 
 ## 四、推荐学习与参考顺序
@@ -146,14 +148,15 @@ AI/
 ├── src/
 │   ├── __init__.py
 │   ├── main.py           # 入口：CLI 或启动服务
-│   ├── agent.py          # ReAct Agent 构建
+│   ├── agent.py          # ReAct Agent、多轮截断
+│   ├── sensitive_hint.py # 阶段 5：敏感类别与本轮注入
 │   ├── prompts.py        # System / User 模板
 │   ├── rag.py            # 文档加载、向量库、检索器
 │   ├── tools/
 │   │   ├── __init__.py
 │   │   ├── rag_tool.py   # RAG 检索 Tool
 │   │   └── mcp_tools.py  # MCP 转 LangChain Tools
-│   └── config.py         # 配置（模型、向量库等）
+│   └── config.py         # 配置（模型、向量库、历史上限等）
 └── tests/
     └── test_agent.py     # 简单单测
 ```

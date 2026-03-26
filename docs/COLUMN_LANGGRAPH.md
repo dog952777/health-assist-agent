@@ -157,6 +157,8 @@
 | 系统提示（含 MCP 追加段） | `src/prompts.py` → `REACT_AGENT_PROMPT`、`REACT_AGENT_MCP_HINT` |
 | 入口选择链还是图 | `src/main.py`（`USE_REACT_AGENT`） |
 | 流程与 messages 推演 | [PHASE3_RUN_FLOW.md](./PHASE3_RUN_FLOW.md)、[PHASE4_RUN_FLOW.md](./PHASE4_RUN_FLOW.md) |
+| 历史上限、最后一条 Human 注入 | `chat_react()` 内 `_trim_chat_history` 与 `augment_user_message_if_needed` |
+| 阶段 5 说明 | [PHASE5_RUN_FLOW.md](./PHASE5_RUN_FLOW.md) |
 
 ---
 
@@ -195,12 +197,13 @@
 
 ---
 
-## 11. 阶段 3 / 4 与 LangGraph（一句话）
+## 11. 阶段 3 / 4 / 5 与 LangGraph（一句话）
 
 | 阶段 | LangGraph 承担什么 |
 |------|---------------------|
 | **3** | 用 **`create_react_agent`** 搭好 **ReAct 拓扑**，按需调用 **时间 / 计算器 / 可选知识库检索工具** |
 | **4** | **拓扑不变**；工具列表增加 **MCP filesystem**（经 `langchain-mcp-adapters` 转成 `BaseTool`），模型仍通过 **同一张图** 调度 |
+| **5** | **不新增子图**；拼 **`messages`** 时截断历史，对**最后一条** `HumanMessage` 做可选敏感前缀（见 `chat_react`） |
 
 ---
 

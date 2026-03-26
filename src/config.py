@@ -151,3 +151,16 @@ def _build_mcp_server_connections() -> dict[str, dict]:
 
 
 MCP_SERVER_CONNECTIONS = _build_mcp_server_connections()
+
+# ---------- 阶段 5：多轮历史上限、敏感场景注入 ----------
+try:
+    CHAT_HISTORY_MAX_TURNS = max(1, int(_strip_env("CHAT_HISTORY_MAX_TURNS", "32") or "32"))
+except ValueError:
+    CHAT_HISTORY_MAX_TURNS = 32
+# 若为 false，则不在用户句前注入【系统安全提示】（仍保留 System Prompt 中的长期合规说明）
+SENSITIVE_HINT_ENABLED = _strip_env("SENSITIVE_HINT_ENABLED", "true").lower() in (
+    "1",
+    "true",
+    "yes",
+    "on",
+)
